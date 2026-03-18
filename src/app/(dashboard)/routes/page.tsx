@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Plus, Pencil, TrendingUp, Wallet, Percent, Trash2 } from "lucide-react";
 import type { RouteWithFeeTiers } from "@/types";
 import { ROUTE_PRESETS } from "@/types";
@@ -17,7 +18,19 @@ type RouteWithStats = RouteWithFeeTiers & {
 
 type FeeTierInput = { minAmount: string; maxAmount: string; feeRate: string };
 
-function AddRouteDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: () => void }) {
+// ---- Add / Edit modal ----
+
+function RouteModal({
+  open,
+  initial,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  initial?: RouteWithFeeTiers | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [name, setName] = useState("");
   const [color, setColor] = useState("#3b82f6");
   const [feeType, setFeeType] = useState<"FIXED" | "TIER">("FIXED");
@@ -30,11 +43,29 @@ function AddRouteDialog({ open, onClose, onAdded }: { open: boolean; onClose: ()
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  function reset() {
-    setName(""); setColor("#3b82f6"); setFeeType("FIXED"); setFeeRate(""); setFeeBasis("PER_TRANSACTION");
-    setFeeTiers([{ minAmount: "0", maxAmount: "100000", feeRate: "" }, { minAmount: "100000", maxAmount: "", feeRate: "" }]);
+  useEffect(() => {
+    if (!open) return;
+    if (initial) {
+      setName(initial.name);
+      setColor(initial.color);
+      setFeeType(initial.feeType);
+      setFeeBasis(initial.feeBasis);
+      setFeeRate(initial.feeRate ? String((Number(initial.feeRate) * 100).toFixed(1)) : "");
+      setFeeTiers(
+        initial.feeTiers.length > 0
+          ? initial.feeTiers.map(t => ({
+              minAmount: String(t.minAmount),
+              maxAmount: t.maxAmount != null ? String(t.maxAmount) : "",
+              feeRate: String((Number(t.feeRate) * 100).toFixed(1)),
+            }))
+          : [{ minAmount: "0", maxAmount: "100000", feeRate: "" }, { minAmount: "100000", maxAmount: "", feeRate: "" }]
+      );
+    } else {
+      setName(""); setColor("#3b82f6"); setFeeType("FIXED"); setFeeRate(""); setFeeBasis("PER_TRANSACTION");
+      setFeeTiers([{ minAmount: "0", maxAmount: "100000", feeRate: "" }, { minAmount: "100000", maxAmount: "", feeRate: "" }]);
+    }
     setError("");
-  }
+  }, [open, initial]);
 
   async function handleSave() {
     if (!name.trim()) { setError("販路名を入力してください"); return; }
@@ -52,9 +83,11 @@ function AddRouteDialog({ open, onClose, onAdded }: { open: boolean; onClose: ()
           feeRate: parseFloat(t.feeRate) / 100,
         })) : [],
       };
-      const res = await fetch("/api/routes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (!res.ok) throw new Error("保存に失敗しました");
-      reset(); onAdded(); onClose();
+      const url = initial ? `/api/routes/${initial.id}` : "/api/routes";
+      const method = initial ? "PUT" : "POST";
+      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (!res.ok) throw new Error();
+      onSaved(); onClose();
     } catch {
       setError("保存に失敗しました");
     } finally {
@@ -66,22 +99,22 @@ function AddRouteDialog({ open, onClose, onAdded }: { open: boolean; onClose: ()
     setFeeTiers(prev => prev.map((t, idx) => idx === i ? { ...t, [field]: value } : t));
   }
 
-  function handleClose() { reset(); onClose(); }
-
   return (
-    <Modal open={open} onClose={handleClose} title="販路を追加">
+    <Modal open={open} onClose={onClose} title={initial ? "販路を編集" : "販路を追加"}>
       <div className="space-y-4">
         {/* 販路名 */}
         <div className="space-y-1.5">
           <label htmlFor="route-name" className="text-sm font-medium">販路名</label>
-          <div className="flex gap-2 flex-wrap">
-            {ROUTE_PRESETS.map(p => (
-              <button key={p.name} onClick={() => { setName(p.name); setColor(p.color); }}
-                className="text-xs px-2 py-1 rounded border hover:bg-muted transition-colors">
-                {p.name}
-              </button>
-            ))}
-          </div>
+          {!initial && (
+            <div className="flex gap-2 flex-wrap">
+              {ROUTE_PRESETS.map(p => (
+                <button key={p.name} onClick={() => { setName(p.name); setColor(p.color); }}
+                  className="text-xs px-2 py-1 rounded border hover:bg-muted transition-colors">
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          )}
           <Input id="route-name" placeholder="例：道の駅" value={name} onChange={e => setName(e.target.value)} />
         </div>
 
@@ -141,7 +174,7 @@ function AddRouteDialog({ open, onClose, onAdded }: { open: boolean; onClose: ()
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={handleClose}>キャンセル</Button>
+          <Button variant="outline" onClick={onClose}>キャンセル</Button>
           <Button onClick={handleSave} disabled={saving}>{saving ? "保存中…" : "保存"}</Button>
         </div>
       </div>
@@ -149,10 +182,14 @@ function AddRouteDialog({ open, onClose, onAdded }: { open: boolean; onClose: ()
   );
 }
 
+// ---- Main page ----
+
 export default function RoutesPage() {
   const [routes, setRoutes] = useState<RouteWithStats[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<RouteWithFeeTiers | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<RouteWithStats | null>(null);
 
   function loadRoutes() {
     Promise.all([
@@ -178,6 +215,12 @@ export default function RoutesPage() {
 
   useEffect(() => { loadRoutes(); }, []);
 
+  async function handleDelete(id: string) {
+    await fetch(`/api/routes/${id}`, { method: "DELETE" });
+    setRoutes(prev => prev.filter(r => r.id !== id));
+    setDeleteTarget(null);
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -187,11 +230,10 @@ export default function RoutesPage() {
             各販路の売上・手数料・利益率を管理します
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={() => setAddOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           販路を追加
         </Button>
-        <AddRouteDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onAdded={loadRoutes} />
       </div>
 
       {loading ? (
@@ -225,9 +267,20 @@ export default function RoutesPage() {
                         />
                         <CardTitle className="text-base">{route.name}</CardTitle>
                       </div>
-                      <button className="text-muted-foreground hover:text-foreground">
-                        <Pencil className="h-4 w-4" />
-                      </button>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => setEditTarget(route)}
+                          className="p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(route)}
+                          className="p-1.5 rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex gap-2 mt-1">
@@ -363,6 +416,26 @@ export default function RoutesPage() {
           </Card>
         </>
       )}
+
+      <RouteModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSaved={loadRoutes}
+      />
+      <RouteModal
+        open={!!editTarget}
+        initial={editTarget}
+        onClose={() => setEditTarget(null)}
+        onSaved={loadRoutes}
+      />
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="販路を削除"
+        description={deleteTarget ? `「${deleteTarget.name}」を削除しますか？関連する売上データは変更されません。` : ""}
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget.id)}
+        onCancel={() => setDeleteTarget(null)}
+        destructive
+      />
     </div>
   );
 }
