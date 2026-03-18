@@ -1,27 +1,32 @@
+import { Suspense } from "react";
 import { KpiCards } from "@/components/dashboard/kpi-cards";
 import { MonthlyChart } from "@/components/dashboard/monthly-chart";
 import { RouteDonut } from "@/components/dashboard/route-donut";
 import { CropRanking } from "@/components/dashboard/crop-ranking";
 import { RecentSales } from "@/components/dashboard/recent-sales";
+import { PeriodSelector } from "@/components/dashboard/period-selector";
 import { createClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
 
-async function getDashboardData(userId: string) {
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+const VALID_MONTHS = [1, 3, 6, 12] as const;
+type ValidMonths = typeof VALID_MONTHS[number];
 
-  const [currentMonth, trend, activeRoutes, gradeRows] = await Promise.all([
+function parseMonths(raw: string | undefined): ValidMonths {
+  const n = parseInt(raw ?? "1");
+  return (VALID_MONTHS.includes(n as ValidMonths) ? n : 1) as ValidMonths;
+}
+
+async function getDashboardData(userId: string, months: ValidMonths) {
+  const now = new Date();
+  const startDate = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+
+  const [records, activeRoutes, gradeRows] = await Promise.all([
     prisma.salesRecord.findMany({
-      where: { userId, date: { gte: startOfMonth } },
+      where: { userId, date: { gte: startDate } },
       include: {
         route: { select: { id: true, name: true, color: true } },
         crop: { select: { id: true, name: true } },
       },
-    }),
-    prisma.salesRecord.findMany({
-      where: { userId, date: { gte: sixMonthsAgo } },
-      include: { route: { select: { id: true, name: true, color: true } } },
       orderBy: { date: "asc" },
     }),
     prisma.route.findMany({
@@ -34,24 +39,23 @@ async function getDashboardData(userId: string) {
     }),
   ]);
 
-  // グレードコード → 表示名マップ（未設定ならコードをそのまま使用）
   const gradeLabelMap: Record<string, string> = gradeRows.length > 0
     ? Object.fromEntries(gradeRows.map(g => [g.code, g.label]))
     : { S: "秀", A: "優", B: "良", X: "規格外" };
 
-  const totalSales = currentMonth.reduce((s, r) => s + r.totalAmount, 0);
-  const totalProfit = currentMonth.reduce((s, r) => s + r.netProfit, 0);
-  const activeRouteIds = new Set(currentMonth.map((r) => r.routeId));
+  const totalSales = records.reduce((s, r) => s + r.totalAmount, 0);
+  const totalProfit = records.reduce((s, r) => s + r.netProfit, 0);
+  const activeRouteIds = new Set(records.map(r => r.routeId));
 
   // Route breakdown
   const routeMap = new Map<string, { name: string; color: string; sales: number; profit: number }>();
-  for (const r of currentMonth) {
+  for (const r of records) {
     const e = routeMap.get(r.routeId) ?? { name: r.route.name, color: r.route.color, sales: 0, profit: 0 };
     e.sales += r.totalAmount;
     e.profit += r.netProfit;
     routeMap.set(r.routeId, e);
   }
-  const routeBreakdown = [...routeMap.values()].map((v) => ({
+  const routeBreakdown = [...routeMap.values()].map(v => ({
     name: v.name,
     color: v.color,
     amount: v.sales,
@@ -61,9 +65,11 @@ async function getDashboardData(userId: string) {
 
   // Monthly trend
   const monthlyMap = new Map<string, Map<string, number>>();
-  for (const r of trend) {
+  for (const r of records) {
     const d = new Date(r.date);
-    const label = `${d.getMonth() + 1}月`;
+    const label = months <= 6
+      ? `${d.getMonth() + 1}月`
+      : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     if (!monthlyMap.has(label)) monthlyMap.set(label, new Map());
     const m = monthlyMap.get(label)!;
     m.set(r.route.name, (m.get(r.route.name) ?? 0) + r.totalAmount);
@@ -74,11 +80,9 @@ async function getDashboardData(userId: string) {
   }));
 
   // Crop ranking
-  const gradeOrder = gradeRows.length > 0
-    ? gradeRows.map(g => g.code)
-    : ["S", "A", "B", "X"];
+  const gradeOrder = gradeRows.length > 0 ? gradeRows.map(g => g.code) : ["S", "A", "B", "X"];
   const cropMap = new Map<string, { name: string; sales: number; profit: number; routeName: string; bestGrade: string }>();
-  for (const r of currentMonth) {
+  for (const r of records) {
     const e = cropMap.get(r.cropId) ?? { name: r.crop.name, sales: 0, profit: 0, routeName: r.route.name, bestGrade: r.grade };
     e.sales += r.totalAmount;
     e.profit += r.netProfit;
@@ -101,10 +105,10 @@ async function getDashboardData(userId: string) {
     }));
 
   // Recent sales
-  const recentSales = [...currentMonth]
+  const recentSales = [...records]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5)
-    .map((r) => {
+    .map(r => {
       const d = new Date(r.date);
       return {
         id: r.id,
@@ -132,23 +136,38 @@ async function getDashboardData(userId: string) {
   };
 }
 
-export default async function DashboardPage() {
+const PERIOD_LABEL: Record<ValidMonths, string> = {
+  1:  "今月",
+  3:  "過去3ヶ月",
+  6:  "過去6ヶ月",
+  12: "過去1年",
+};
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ months?: string }>;
+}) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-
-  const now = new Date();
-  const label = `${now.getFullYear()}年${now.getMonth() + 1}月`;
-
   if (!user) return null;
 
-  const data = await getDashboardData(user.id);
+  const { months: monthsStr } = await searchParams;
+  const months = parseMonths(monthsStr);
+
+  const data = await getDashboardData(user.id, months);
   const isEmpty = data.totalSales === 0;
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">ダッシュボード</h1>
-        <p className="text-muted-foreground text-sm mt-1">{label}</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold">ダッシュボード</h1>
+          <p className="text-muted-foreground text-sm mt-1">{PERIOD_LABEL[months]}</p>
+        </div>
+        <Suspense>
+          <PeriodSelector current={String(months)} />
+        </Suspense>
       </div>
 
       <KpiCards
@@ -161,8 +180,8 @@ export default async function DashboardPage() {
 
       {isEmpty ? (
         <div className="rounded-lg border bg-muted/30 py-16 text-center text-muted-foreground text-sm">
-          <p className="font-medium">まだ売上データがありません</p>
-          <p className="mt-1">「売上入力」から今月の売上を記録しましょう</p>
+          <p className="font-medium">この期間の売上データがありません</p>
+          <p className="mt-1">「売上入力」から売上を記録しましょう</p>
         </div>
       ) : (
         <>
