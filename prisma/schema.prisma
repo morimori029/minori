@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum FeeType {
+  FIXED // 固定率
+  TIER  // 段階手数料
+}
+
+enum FeeBasis {
+  MONTHLY         // 月次累計でリセット
+  PER_TRANSACTION // 取引ごとに独立計算
+  ANNUAL          // 年次累計でリセット
+}
+
+enum ShipmentStatus {
+  PLANNED   // 予定
+  SHIPPED   // 出荷済み
+  CANCELLED // キャンセル
+}
+
+enum InvoiceStatus {
+  DRAFT   // 下書き
+  SENT    // 送付済み
+  PAID    // 支払済み
+  OVERDUE // 期限超過
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  name           String?
+  farmName       String?  @map("farm_name")
+  location       String?
+  invoiceNumber  String?  @map("invoice_number")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  routes        Route[]
+  crops         Crop[]
+  salesRecords  SalesRecord[]
+  inventory     Inventory[]
+  shipmentPlans ShipmentPlan[]
+  invoices      Invoice[]
+  gradeLabels   GradeLabel[]
+
+  @@map("users")
+}
+
+model GradeLabel {
+  id        String @id @default(uuid())
+  userId    String @map("user_id")
+  code      String // ユーザー定義のコード（例: S, A, 特選）
+  label     String // 表示名（例: 秀, 優, 特選品）
+  sortOrder Int    @default(0) @map("sort_order")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, code])
+  @@map("grade_labels")
+}
+
+model Route {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  name       String
+  color      String   @default("#3b82f6")
+  feeType    FeeType  @map("fee_type")
+  feeRate    Decimal? @map("fee_rate") @db.Decimal(5, 4)
+  feeBasis   FeeBasis @default(MONTHLY) @map("fee_basis")
+  resetDay   Int      @default(1) @map("reset_day")
+  monthlyFee Int?     @map("monthly_fee")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feeTiers      FeeTier[]
+  salesRecords  SalesRecord[]
+  shipmentPlans ShipmentPlan[]
+
+  @@map("routes")
+}
+
+model FeeTier {
+  id        String  @id @default(uuid())
+  routeId   String  @map("route_id")
+  minAmount Int     @map("min_amount")
+  maxAmount Int?    @map("max_amount")
+  feeRate   Decimal @map("fee_rate") @db.Decimal(5, 4)
+
+  route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@map("fee_tiers")
+}
+
+model Crop {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  unit      String   @default("kg")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  salesRecords  SalesRecord[]
+  inventory     Inventory[]
+  shipmentPlans ShipmentPlan[]
+
+  @@map("crops")
+}
+
+model SalesRecord {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  routeId     String   @map("route_id")
+  cropId      String   @map("crop_id")
+  date        DateTime @db.Date
+  grade       String   // ユーザー定義のグレードコード
+  unitPrice   Int      @map("unit_price")
+  quantity    Decimal  @db.Decimal(10, 2)
+  totalAmount Int      @map("total_amount")
+  feeRate     Decimal  @map("fee_rate") @db.Decimal(5, 4)
+  feeAmount   Int      @map("fee_amount")
+  netProfit   Int      @map("net_profit")
+  memo        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  route Route @relation(fields: [routeId], references: [id])
+  crop  Crop  @relation(fields: [cropId], references: [id])
+
+  @@map("sales_records")
+}
+
+model Inventory {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  cropId      String   @map("crop_id")
+  stockAmount Decimal  @map("stock_amount") @db.Decimal(10, 2)
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  crop Crop @relation(fields: [cropId], references: [id])
+
+  @@unique([userId, cropId])
+  @@map("inventory")
+}
+
+model ShipmentPlan {
+  id            String         @id @default(uuid())
+  userId        String         @map("user_id")
+  routeId       String         @map("route_id")
+  cropId        String         @map("crop_id")
+  plannedDate   DateTime       @map("planned_date") @db.Date
+  plannedAmount Decimal        @map("planned_amount") @db.Decimal(10, 2)
+  status        ShipmentStatus @default(PLANNED)
+  memo          String?
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  route Route @relation(fields: [routeId], references: [id])
+  crop  Crop  @relation(fields: [cropId], references: [id])
+
+  @@map("shipment_plans")
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  userId        String        @map("user_id")
+  invoiceNumber String        @map("invoice_number")
+  clientName    String        @map("client_name")
+  clientAddress String?       @map("client_address")
+  bankInfo      String?       @map("bank_info")
+  issueDate     DateTime      @map("issue_date") @db.Date
+  dueDate       DateTime      @map("due_date") @db.Date
+  subtotal      Int
+  tax           Int
+  total         Int
+  status        InvoiceStatus @default(DRAFT)
+  memo          String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items InvoiceItem[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(uuid())
+  invoiceId   String  @map("invoice_id")
+  description String
+  quantity    Decimal @db.Decimal(10, 2)
+  unitPrice   Int     @map("unit_price")
+  amount      Int
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
