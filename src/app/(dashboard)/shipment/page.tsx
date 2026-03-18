@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { useGradeLabels } from "@/lib/use-grade-labels";
 import { Plus, Truck, Trash2 } from "lucide-react";
 
 type RouteOption = { id: string; name: string; color: string };
@@ -34,7 +35,134 @@ const STATUS_CLASS: Record<ShipmentStatus, string> = {
   CANCELLED: "bg-gray-100 text-gray-500",
 };
 
-// ---- Add modal ----
+// ---- 出荷記録モーダル ----
+
+function ShipRecordModal({
+  plan,
+  onClose,
+  onConfirmed,
+}: {
+  plan: Plan | null;
+  onClose: () => void;
+  onConfirmed: () => void;
+}) {
+  const gradeLabels = useGradeLabels();
+  const [date, setDate] = useState("");
+  const [grade, setGrade] = useState("");
+  const [unitPrice, setUnitPrice] = useState("");
+  const [memo, setMemo] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (plan) {
+      setDate(plan.plannedDate);
+      setGrade(gradeLabels[0]?.code ?? "");
+      setUnitPrice("");
+      setMemo(plan.memo ?? "");
+      setError("");
+    }
+  }, [plan, gradeLabels]);
+
+  if (!plan) return null;
+
+  const currentPlan = plan;
+  const quantity = parseFloat(currentPlan.plannedAmount);
+  const price = parseInt(unitPrice);
+  const totalAmount = !isNaN(quantity) && !isNaN(price) ? Math.round(quantity * price) : null;
+
+  async function handleSave() {
+    const n = parseInt(unitPrice);
+    if (isNaN(n) || n <= 0) { setError("単価を入力してください"); return; }
+    if (!grade) { setError("グレードを選択してください"); return; }
+
+    setSaving(true); setError("");
+    try {
+      const res = await fetch(`/api/shipment/${currentPlan.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "SHIPPED",
+          salesData: { grade, unitPrice: n, date, memo: memo || null },
+        }),
+      });
+      if (!res.ok) throw new Error();
+      onConfirmed();
+      onClose();
+    } catch {
+      setError("保存に失敗しました");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open={true} onClose={onClose} title="出荷記録を登録">
+      <p className="text-sm text-muted-foreground mb-4">
+        出荷済みにすると売上記録が自動作成されます
+      </p>
+      <div className="space-y-3">
+        {/* 作物・数量（表示のみ） */}
+        <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm flex justify-between">
+          <span className="text-muted-foreground">作物</span>
+          <span className="font-medium">{currentPlan.crop.name}　{quantity}{currentPlan.crop.unit}</span>
+        </div>
+
+        <div>
+          <label htmlFor="ship-rec-date" className="text-sm font-medium mb-1 block">出荷日</label>
+          <Input id="ship-rec-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
+        </div>
+
+        <div>
+          <label htmlFor="ship-rec-grade" className="text-sm font-medium mb-1 block">グレード</label>
+          <select
+            id="ship-rec-grade"
+            value={grade}
+            onChange={e => setGrade(e.target.value)}
+            className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+          >
+            {gradeLabels.map(g => (
+              <option key={g.code} value={g.code}>{g.label}（{g.code}）</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="ship-rec-price" className="text-sm font-medium mb-1 block">単価（円）</label>
+          <Input
+            id="ship-rec-price"
+            type="number"
+            min="0"
+            placeholder="例：500"
+            value={unitPrice}
+            onChange={e => setUnitPrice(e.target.value)}
+            autoFocus
+          />
+          {totalAmount !== null && (
+            <p className="text-xs text-muted-foreground mt-1">
+              合計：¥{totalAmount.toLocaleString()}（手数料は自動計算）
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="ship-rec-memo" className="text-sm font-medium mb-1 block">メモ</label>
+          <Input id="ship-rec-memo" placeholder="備考" value={memo} onChange={e => setMemo(e.target.value)} />
+        </div>
+
+        {error && <p className="text-sm text-red-500">{error}</p>}
+      </div>
+      <div className="flex gap-2 mt-4">
+        <Button variant="outline" className="flex-1" onClick={onClose}>キャンセル</Button>
+        <Button className="flex-1" onClick={handleSave} disabled={saving}>
+          {saving ? "保存中..." : "出荷済みにする"}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+// ---- 追加モーダル ----
 
 function AddModal({
   open,
@@ -135,7 +263,7 @@ function AddModal({
   );
 }
 
-// ---- Main page ----
+// ---- メインページ ----
 
 export default function ShipmentPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -145,6 +273,7 @@ export default function ShipmentPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [filter, setFilter] = useState<ShipmentStatus | "ALL">("ALL");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [shipTarget, setShipTarget] = useState<Plan | null>(null);
 
   async function load() {
     setLoading(true);
@@ -178,7 +307,6 @@ export default function ShipmentPage() {
 
   const filtered = filter === "ALL" ? plans : plans.filter(p => p.status === filter);
 
-  // 今後7日以内の予定件数
   const upcoming = plans.filter(p => {
     if (p.status !== "PLANNED") return false;
     const diff = new Date(p.plannedDate).getTime() - Date.now();
@@ -279,7 +407,14 @@ export default function ShipmentPage() {
                   <div className="flex items-center gap-2 shrink-0">
                     <select
                       value={plan.status}
-                      onChange={e => updateStatus(plan.id, e.target.value as ShipmentStatus)}
+                      onChange={e => {
+                        const next = e.target.value as ShipmentStatus;
+                        if (next === "SHIPPED" && plan.status !== "SHIPPED") {
+                          setShipTarget(plan);
+                        } else {
+                          updateStatus(plan.id, next);
+                        }
+                      }}
                       className={`text-xs px-2 py-1 rounded-full border-0 font-medium cursor-pointer ${STATUS_CLASS[plan.status]}`}
                     >
                       {(Object.keys(STATUS_LABEL) as ShipmentStatus[]).map(s => (
@@ -306,6 +441,13 @@ export default function ShipmentPage() {
         crops={crops}
         onClose={() => setAddOpen(false)}
         onAdded={load}
+      />
+      <ShipRecordModal
+        plan={shipTarget}
+        onClose={() => setShipTarget(null)}
+        onConfirmed={() => {
+          setPlans(prev => prev.map(p => p.id === shipTarget?.id ? { ...p, status: "SHIPPED" } : p));
+        }}
       />
       <ConfirmModal
         open={deleteTarget !== null}
