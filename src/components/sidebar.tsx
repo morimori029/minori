@@ -45,44 +45,46 @@ export function Sidebar({ email }: SidebarProps) {
   }
 
   return (
-    <aside className="hidden md:flex w-60 shrink-0 border-r bg-background flex-col h-screen sticky top-0">
-      {/* ロゴ */}
-      <div className="flex items-center gap-2 px-6 py-5 border-b">
-        <Sprout className="h-6 w-6 text-green-600" />
-        <span className="text-xl font-bold text-green-700">みのり</span>
-      </div>
+    <aside className="hidden md:block w-60 shrink-0 border-r bg-background h-screen sticky top-0">
+      <div className="flex flex-col h-full">
+        {/* ロゴ */}
+        <div className="flex items-center gap-2 px-6 py-5 border-b">
+          <Sprout className="h-6 w-6 text-green-600" />
+          <span className="text-xl font-bold text-green-700">みのり</span>
+        </div>
 
-      {/* ナビゲーション */}
-      <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-        {navItems.map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-              pathname === href
-                ? "bg-green-50 text-green-700"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            )}
+        {/* ナビゲーション */}
+        <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+          {navItems.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                pathname === href
+                  ? "bg-green-50 text-green-700"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {label}
+            </Link>
+          ))}
+        </nav>
+
+        {/* フッター：ユーザー情報＋ログアウト */}
+        <div className="px-4 py-4 border-t space-y-2">
+          {email && (
+            <p className="text-xs text-muted-foreground truncate px-2">{email}</p>
+          )}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
-            <Icon className="h-4 w-4 shrink-0" />
-            {label}
-          </Link>
-        ))}
-      </nav>
-
-      {/* フッター：ユーザー情報＋ログアウト */}
-      <div className="px-4 py-4 border-t space-y-2">
-        {email && (
-          <p className="text-xs text-muted-foreground truncate px-2">{email}</p>
-        )}
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-        >
-          <LogOut className="h-4 w-4 shrink-0" />
-          ログアウト
-        </button>
+            <LogOut className="h-4 w-4 shrink-0" />
+            ログアウト
+          </button>
+        </div>
       </div>
     </aside>
   );

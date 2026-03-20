@@ -47,22 +47,24 @@ export function MobileHeader({ email }: { email?: string }) {
 
   return (
     <>
-      {/* モバイル用トップバー */}
-      <header className="md:hidden flex items-center justify-between px-4 py-3 border-b bg-background sticky top-0 z-40">
-        <div className="flex items-center gap-2">
-          <Sprout className="h-5 w-5 text-green-600" />
-          <span className="text-lg font-bold text-green-700">みのり</span>
+      {/* モバイル用トップバー（md以上では非表示） */}
+      <header className="md:hidden border-b bg-background sticky top-0 z-40">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Sprout className="h-5 w-5 text-green-600" />
+            <span className="text-lg font-bold text-green-700">みのり</span>
+          </div>
+          <button
+            onClick={() => setOpen(!open)}
+            className="p-1.5 rounded-lg hover:bg-muted"
+            aria-label="メニュー"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
         </div>
-        <button
-          onClick={() => setOpen(!open)}
-          className="p-1.5 rounded-lg hover:bg-muted"
-          aria-label="メニュー"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
       </header>
 
-      {/* オーバーレイ */}
+      {/* オーバーレイ（md以上では非表示） */}
       {open && (
         <div
           className="md:hidden fixed inset-0 z-40 bg-black/40"
@@ -70,56 +72,58 @@ export function MobileHeader({ email }: { email?: string }) {
         />
       )}
 
-      {/* スライドメニュー */}
+      {/* スライドメニュー（md以上では非表示） */}
       <div
         className={cn(
-          "md:hidden fixed top-0 right-0 bottom-0 z-50 w-64 bg-background border-l shadow-xl flex flex-col transition-transform duration-200",
+          "md:hidden fixed top-0 right-0 bottom-0 z-50 w-64 bg-background border-l shadow-xl transition-transform duration-200",
           open ? "translate-x-0" : "translate-x-full"
         )}
       >
-        <div className="flex items-center justify-between px-4 py-4 border-b">
-          <div className="flex items-center gap-2">
-            <Sprout className="h-5 w-5 text-green-600" />
-            <span className="font-bold text-green-700">みのり</span>
-          </div>
-          <button
-            onClick={() => setOpen(false)}
-            className="p-1.5 rounded-lg hover:bg-muted"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-          {navItems.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
+        <div className="flex flex-col h-full">
+          <div className="flex items-center justify-between px-4 py-4 border-b">
+            <div className="flex items-center gap-2">
+              <Sprout className="h-5 w-5 text-green-600" />
+              <span className="font-bold text-green-700">みのり</span>
+            </div>
+            <button
               onClick={() => setOpen(false)}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                pathname === href
-                  ? "bg-green-50 text-green-700"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
+              className="p-1.5 rounded-lg hover:bg-muted"
             >
-              <Icon className="h-4 w-4 shrink-0" />
-              {label}
-            </Link>
-          ))}
-        </nav>
+              <X className="h-5 w-5" />
+            </button>
+          </div>
 
-        <div className="px-4 py-4 border-t space-y-2">
-          {email && (
-            <p className="text-xs text-muted-foreground truncate px-2">{email}</p>
-          )}
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <LogOut className="h-4 w-4 shrink-0" />
-            ログアウト
-          </button>
+          <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+            {navItems.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                  pathname === href
+                    ? "bg-green-50 text-green-700"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="px-4 py-4 border-t space-y-2">
+            {email && (
+              <p className="text-xs text-muted-foreground truncate px-2">{email}</p>
+            )}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <LogOut className="h-4 w-4 shrink-0" />
+              ログアウト
+            </button>
+          </div>
         </div>
       </div>
     </>
