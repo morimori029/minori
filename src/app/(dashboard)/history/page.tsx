@@ -101,7 +101,7 @@ export default function HistoryPage() {
   const monthLabel = monthOptions.find(o => o.value === month)?.label ?? "全期間";
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">売上履歴</h1>

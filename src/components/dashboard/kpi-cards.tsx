@@ -23,7 +23,7 @@ export function KpiCards({
   const profitRate = totalSales > 0 ? ((netProfit / totalSales) * 100).toFixed(1) : "0.0";
 
   return (
-    <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
       {/* 総売上 */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -33,7 +33,7 @@ export function KpiCards({
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold">{formatYen(totalSales)}</p>
+          <p className="text-lg md:text-2xl font-bold">{formatYen(totalSales)}</p>
         </CardContent>
       </Card>
 
@@ -46,7 +46,7 @@ export function KpiCards({
           <Wallet className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold text-green-600">{formatYen(netProfit)}</p>
+          <p className="text-lg md:text-2xl font-bold text-green-600">{formatYen(netProfit)}</p>
           <p className="text-xs text-muted-foreground mt-1">利益率 {profitRate}%</p>
         </CardContent>
       </Card>
@@ -60,7 +60,7 @@ export function KpiCards({
           <Store className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold">{activeRoutes}</p>
+          <p className="text-lg md:text-2xl font-bold">{activeRoutes}</p>
           <p className="text-xs text-muted-foreground mt-1">販路</p>
         </CardContent>
       </Card>
@@ -74,7 +74,7 @@ export function KpiCards({
           <Trophy className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold">{topRouteName || "—"}</p>
+          <p className="text-lg md:text-2xl font-bold truncate">{topRouteName || "—"}</p>
           {topRouteName && (
             <p className="text-xs text-muted-foreground mt-1">
               利益率 {topRouteProfitRate.toFixed(1)}%

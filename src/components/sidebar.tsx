@@ -45,7 +45,7 @@ export function Sidebar({ email }: SidebarProps) {
   }
 
   return (
-    <aside className="w-60 shrink-0 border-r bg-background flex flex-col h-screen sticky top-0">
+    <aside className="hidden md:flex w-60 shrink-0 border-r bg-background flex-col h-screen sticky top-0">
       {/* ロゴ */}
       <div className="flex items-center gap-2 px-6 py-5 border-b">
         <Sprout className="h-6 w-6 text-green-600" />

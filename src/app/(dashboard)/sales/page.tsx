@@ -185,7 +185,7 @@ export default function SalesPage() {
   if (loading) return <div className="p-6 text-muted-foreground text-sm">読み込み中…</div>;
 
   return (
-    <div className="p-6 max-w-2xl space-y-6">
+    <div className="p-4 md:p-6 max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold">売上入力</h1>
         <p className="text-muted-foreground text-sm mt-1">
@@ -249,7 +249,7 @@ export default function SalesPage() {
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* 販路・日付 */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">販路</label>
               <Select value={routeId} onValueChange={(v) => v && setRouteId(v)}>
@@ -270,7 +270,7 @@ export default function SalesPage() {
           </div>
 
           {/* 作物・グレード */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">作物</label>
               <Select value={cropId} onValueChange={(v) => v && setCropId(v)}>
@@ -302,7 +302,7 @@ export default function SalesPage() {
           </div>
 
           {/* 数量・単位・単価 */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">数量</label>
               <Input type="number" min="0" step="0.1" placeholder="0" value={quantity} onChange={(e) => setQuantity(e.target.value)} />

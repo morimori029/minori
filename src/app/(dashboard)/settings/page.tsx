@@ -261,7 +261,7 @@ function ThresholdCard() {
 
 export default function SettingsPage() {
   return (
-    <div className="p-6 max-w-lg space-y-6">
+    <div className="p-4 md:p-6 max-w-lg space-y-6">
       <div>
         <h1 className="text-2xl font-bold">農園設定</h1>
         <p className="text-muted-foreground text-sm mt-1">農園プロフィールや各種名称を設定します</p>

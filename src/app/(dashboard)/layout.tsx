@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/sidebar";
+import { MobileHeader } from "@/components/mobile-header";
 import { createClient } from "@/lib/supabase-server";
 
 export default async function DashboardLayout({
@@ -12,9 +13,12 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-muted/30">
       <Sidebar email={user?.email} />
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
+      <div className="flex-1 flex flex-col min-w-0">
+        <MobileHeader email={user?.email} />
+        <main className="flex-1 overflow-auto">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
