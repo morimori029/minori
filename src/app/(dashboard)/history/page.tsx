@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Trash2, TrendingUp } from "lucide-react";
+import { Download, Trash2, TrendingUp, FileText } from "lucide-react";
 import { useGradeLabelMap } from "@/lib/use-grade-labels";
 
 type SalesRecord = {
@@ -117,6 +117,18 @@ export default function HistoryPage() {
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
+          <Button
+            variant="outline"
+            disabled={records.length === 0}
+            onClick={() => {
+              const params = new URLSearchParams();
+              if (month) params.set("month", month);
+              window.open(`/sales-report/print?${params}`, "_blank");
+            }}
+          >
+            <FileText className="h-4 w-4 mr-1" />
+            帳票
+          </Button>
           <Button
             variant="outline"
             disabled={records.length === 0}
